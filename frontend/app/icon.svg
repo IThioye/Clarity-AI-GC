@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+  <defs>
+    <filter id="HaloBlur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="40" />
+    </filter>
+    <filter id="SoftBlur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="20" />
+    </filter>
+    <filter id="InnerShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur" />
+      <feOffset dy="2" result="off" />
+      <feComposite in="off" in2="blur" operator="arithmetic" k2="-1" k3="1" result="innerShadow" />
+      <feColorMatrix in="innerShadow" type="matrix"
+        values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.55 0" />
+      <feComposite in="SourceGraphic" operator="over" />
+    </filter>
+    <linearGradient id="TopLobe" x1="20%" y1="20%" x2="90%" y2="90%">
+      <stop offset="0%"  stop-color="#EAF3FF"/>
+      <stop offset="45%" stop-color="#BFD8FF"/>
+      <stop offset="100%" stop-color="#A7C9FF"/>
+    </linearGradient>
+    <linearGradient id="BottomLobe" x1="85%" y1="85%" x2="15%" y2="15%">
+      <stop offset="0%"  stop-color="#F9A9D3"/>
+      <stop offset="60%" stop-color="#C58AFF"/>
+      <stop offset="100%" stop-color="#8FC8FF"/>
+    </linearGradient>
+    <clipPath id="InnerClip">
+      <circle cx="400" cy="420" r="270"/>
+    </clipPath>
+  </defs>
+  <g filter="url(#HaloBlur)">
+    <circle cx="400" cy="420" r="300" fill="#8FC8FF" opacity="0.12"/>
+  </g>
+  <circle cx="400" cy="420" r="270" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.65)" stroke-width="6" filter="url(#InnerShadow)"/>
+  <g clip-path="url(#InnerClip)">
+    <rect x="130" y="150" width="540" height="540" fill="rgba(8,10,24,0.55)"/>
+    <path d="M 140 390 C 235 300, 335 265, 405 292 C 480 322, 540 365, 655 360 L 655 140 L 140 140 Z" fill="url(#TopLobe)"/>
+    <path d="M 140 450 C 280 456, 360 428, 420 386 C 505 332, 575 332, 655 352 L 655 700 L 140 700 Z" fill="url(#BottomLobe)"/>
+  </g>
+  <circle cx="400" cy="420" r="258" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="3"/>
+</svg>

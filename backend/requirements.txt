@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+gunicorn
+httpx
+requests
+numpy
+google-cloud-aiplatform
+google-cloud-texttospeech
+google-cloud-speech
+python-dotenv
+python-multipart
