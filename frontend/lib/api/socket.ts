@@ -4,6 +4,9 @@ import { GCP_AGENT_WS_URL } from '@/lib/config';
 import { useJournalStore, type ChatMessage } from '@/lib/store';
 import { useAuthStore } from '@/lib/authStore';
 
+const formatTimestamp = () =>
+  new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
 let socket: WebSocket | null = null;
 let isConnected = false;
 const pendingMessages: any[] = [];
@@ -54,7 +57,7 @@ const connectSocket = (userId: string) => {
 
     // This is where we handle the 3 message types from our server
     switch (message.type) {
-      case 'ACK':
+      case 'ACK': {
         // Confirmation that a "NONE" route was processed
         console.log('Server ACK:', message.status);
         useJournalStore.setState((state) => {
@@ -79,18 +82,66 @@ const connectSocket = (userId: string) => {
           };
         });
         break;
+      }
 
       case 'TOKEN':
         // This is the "live typing" stream.
         // We append the new token to the last message in the chat.
-        setChat(
-          useJournalStore.getState().chat.map((msg, index, arr) => {
-            if (index === arr.length - 1) {
-              return { ...msg, text: msg.text + message.payload };
+        (() => {
+          const payload =
+            typeof message.payload === 'string'
+              ? message.payload
+              : String(message.payload ?? '');
+          if (!payload) {
+            return;
+          }
+
+          const queuedAssistantId = assistantMessageQueue[0];
+          let matched = false;
+          let replacementId: string | null = null;
+
+          useJournalStore.setState((state) => {
+            if (queuedAssistantId) {
+              const updated = state.chat.map((msg) => {
+                if (msg.id === queuedAssistantId) {
+                  matched = true;
+                  return {
+                    ...msg,
+                    text: `${msg.text ?? ''}${payload}`,
+                    time: msg.text ? msg.time : msg.time || formatTimestamp(),
+                  };
+                }
+                return msg;
+              });
+
+              if (matched) {
+                return { chat: updated };
+              }
             }
-            return msg;
-          })
-        );
+
+            const id = crypto.randomUUID();
+            replacementId = id;
+            return {
+              chat: [
+                ...state.chat,
+                {
+                  id,
+                  role: 'assistant' as const,
+                  text: payload,
+                  time: formatTimestamp(),
+                },
+              ],
+            };
+          });
+
+          if (replacementId) {
+            if (assistantMessageQueue.length === 0) {
+              assistantMessageQueue.push(replacementId);
+            } else if (!matched) {
+              assistantMessageQueue[0] = replacementId;
+            }
+          }
+        })();
         break;
 
       case 'AUDIO':
@@ -148,20 +199,21 @@ export const sendChatMessage = (text: string) => {
     id: crypto.randomUUID(),
     role: 'user' as const,
     text,
-    time: new Date().toISOString(),
+    time: formatTimestamp(),
   };
-  
+
   // 3. Create the empty "assistant" bubble for the tokens to stream into
   const assistantMessage = {
     id: crypto.randomUUID(),
     role: 'assistant' as const,
     text: '', // Start with an empty text
-    time: new Date().toISOString(),
+    time: formatTimestamp(),
   };
 
   // Update the store
   const currentChat = useJournalStore.getState().chat;
   setChat([...currentChat, userMessage, assistantMessage]);
+  assistantMessageQueue.push(assistantMessage.id);
 
   // 4. Send the user's text to the backend
   const sent = sendOverSocket({
