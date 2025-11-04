@@ -13,9 +13,6 @@ type ThemeState = {
 export const useThemeStore = create<ThemeState>((set) => ({
   theme: 'dark',
   setTheme: (t) => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('dark', t === 'dark');
-    }
     set({ theme: t });
   },
 }));

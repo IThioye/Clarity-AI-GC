@@ -1,18 +1,30 @@
 
 
 import { GCP_AGENT_WS_URL } from '@/lib/config';
-import { useJournalStore } from '@/lib/store';
+import { useJournalStore, type ChatMessage } from '@/lib/store';
 import { useAuthStore } from '@/lib/authStore';
 
 let socket: WebSocket | null = null;
 let isConnected = false;
+const pendingMessages: any[] = [];
 
 // We get the chat update function from the Zustand store
 const { setChat } = useJournalStore.getState();
 
 const connectSocket = (userId: string) => {
-  if (socket && isConnected) {
-    console.log('WebSocket already connected.');
+  if (socket) {
+    if (isConnected) {
+      console.log('WebSocket already connected.');
+      return;
+    }
+    if (socket.readyState === WebSocket.CONNECTING) {
+      console.log('WebSocket connection is in progress.');
+      return;
+    }
+  }
+
+  if (typeof WebSocket === 'undefined') {
+    console.error('WebSocket is not supported in this environment.');
     return;
   }
 
@@ -27,16 +39,45 @@ const connectSocket = (userId: string) => {
   socket.onopen = () => {
     console.log('WebSocket connected to Agent Service.');
     isConnected = true;
+    while (pendingMessages.length > 0) {
+      const queued = pendingMessages.shift();
+      try {
+        socket?.send(JSON.stringify(queued));
+      } catch (error) {
+        console.error('Failed to flush queued message', error);
+      }
+    }
   };
 
   socket.onmessage = (event) => {
     const message = JSON.parse(event.data);
-    
+
     // This is where we handle the 3 message types from our server
     switch (message.type) {
       case 'ACK':
         // Confirmation that a "NONE" route was processed
         console.log('Server ACK:', message.status);
+        useJournalStore.setState((state) => {
+          const ackText = message.text || 'I’ve logged that entry for you.';
+          const updated: ChatMessage[] = [...state.chat];
+          for (let i = updated.length - 1; i >= 0; i -= 1) {
+            if (updated[i]?.role === 'assistant') {
+              updated[i] = { ...updated[i], text: ackText };
+              return { chat: updated };
+            }
+          }
+          return {
+            chat: [
+              ...updated,
+              {
+                id: crypto.randomUUID(),
+                role: 'assistant' as const,
+                text: ackText,
+                time: new Date().toISOString(),
+              },
+            ],
+          };
+        });
         break;
 
       case 'TOKEN':
@@ -56,8 +97,12 @@ const connectSocket = (userId: string) => {
         // The chat is finished, and we received the audio.
         // The frontend can now play this base64 audio.
         console.log('Received audio data.');
-        const audio = new Audio('data:audio/mp3;base64,' + message.payload);
-        audio.play();
+        try {
+          const audio = new Audio('data:audio/mp3;base64,' + message.payload);
+          void audio.play();
+        } catch (error) {
+          console.error('Failed to play audio response:', error);
+        }
         break;
     }
   };
@@ -66,6 +111,7 @@ const connectSocket = (userId: string) => {
     console.log('WebSocket disconnected.');
     isConnected = false;
     socket = null;
+    pendingMessages.length = 0;
     // We could add auto-reconnect logic here
   };
 
@@ -77,9 +123,16 @@ const connectSocket = (userId: string) => {
 const sendOverSocket = (message: any) => {
   if (socket && isConnected) {
     socket.send(JSON.stringify(message));
-  } else {
-    console.error('WebSocket not connected. Cannot send message.');
+    return true;
   }
+
+  if (socket) {
+    pendingMessages.push(message);
+    return true;
+  }
+
+  console.error('WebSocket not connected. Cannot send message.');
+  return false;
 };
 
 export const sendChatMessage = (text: string) => {
@@ -111,10 +164,24 @@ export const sendChatMessage = (text: string) => {
   setChat([...currentChat, userMessage, assistantMessage]);
 
   // 4. Send the user's text to the backend
-  sendOverSocket({
+  const sent = sendOverSocket({
     type: 'NEW_ENTRY',
     payload: {
       raw_text: text,
     },
   });
+
+  if (!sent) {
+    useJournalStore.setState((state) => ({
+      chat: state.chat.map((msg) =>
+        msg.id === assistantMessage.id
+          ? {
+              ...msg,
+              text:
+                'I could not reach our thinking space just now. Please check your connection and try again.',
+            }
+          : msg
+      ),
+    }));
+  }
 };
