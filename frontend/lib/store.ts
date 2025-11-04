@@ -13,9 +13,6 @@ type ThemeState = {
 export const useThemeStore = create<ThemeState>((set) => ({
   theme: 'dark',
   setTheme: (t) => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('dark', t === 'dark');
-    }
     set({ theme: t });
   },
 }));
@@ -138,20 +135,27 @@ type JournalState = {
   journal: JournalEntry[];
   moods: MoodEntry[];
   chat: ChatMessage[];
+  assistantQueue: string[];
   fetchJournal: (userId: string) => Promise<void>;
   fetchMoods: (userId: string, journalId: number) => Promise<void>;
   addMood: (mood: number, note?: string) => Promise<void>;
   setChat: (msgs: ChatMessage[]) => void;
+  enqueueAssistant: (id: string) => void;
+  dequeueAssistant: () => string | undefined;
+  peekAssistant: () => string | undefined;
+  replaceAssistantHead: (id: string) => void;
+  removeAssistant: (id: string) => void;
   clearChat: () => void;
   addJournal: (content: string) => void;
   removeJournal: (id: string) => void;
   clearJournal: () => void;
 };
 
-export const useJournalStore = create<JournalState>((set) => ({
+export const useJournalStore = create<JournalState>((set, get) => ({
   journal: [],
   moods: [],
   chat: [],
+  assistantQueue: [],
 
   fetchJournal: async (userId: string) => {
     try {
@@ -205,9 +209,38 @@ export const useJournalStore = create<JournalState>((set) => ({
   setChat: (msgs) => {
     set({ chat: msgs });
   },
-  
+
+  enqueueAssistant: (id: string) => {
+    set((state) => ({ assistantQueue: [...state.assistantQueue, id] }));
+  },
+
+  dequeueAssistant: () => {
+    const [head, ...rest] = get().assistantQueue;
+    if (!head) {
+      return undefined;
+    }
+    set({ assistantQueue: rest });
+    return head;
+  },
+
+  peekAssistant: () => get().assistantQueue[0],
+
+  replaceAssistantHead: (id: string) => {
+    set((state) =>
+      state.assistantQueue.length === 0
+        ? { assistantQueue: [id] }
+        : { assistantQueue: [id, ...state.assistantQueue.slice(1)] }
+    );
+  },
+
+  removeAssistant: (id: string) => {
+    set((state) => ({
+      assistantQueue: state.assistantQueue.filter((existing) => existing !== id),
+    }));
+  },
+
   clearChat: () => {
-    set({ chat: [] });
+    set({ chat: [], assistantQueue: [] });
   },
 
   addJournal: (content: string) => {
