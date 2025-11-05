@@ -1,7 +1,7 @@
 
 
 import { GCP_AGENT_WS_URL } from '@/lib/config';
-import { useJournalStore } from '@/lib/store';
+import { useJournalStore, type ChatMessage } from '@/lib/store';
 import { useAuthStore } from '@/lib/authStore';
 
 const formatTimestamp = () =>
