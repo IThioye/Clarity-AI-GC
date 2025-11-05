@@ -13,9 +13,6 @@ type ThemeState = {
 export const useThemeStore = create<ThemeState>((set) => ({
   theme: 'dark',
   setTheme: (t) => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.toggle('dark', t === 'dark');
-    }
     set({ theme: t });
   },
 }));
@@ -138,20 +135,70 @@ type JournalState = {
   journal: JournalEntry[];
   moods: MoodEntry[];
   chat: ChatMessage[];
+  assistantMessageQueue: string[];
+  flushAssistantQueue: (fallback?: { text: string; time: string }) => void;
   fetchJournal: (userId: string) => Promise<void>;
   fetchMoods: (userId: string, journalId: number) => Promise<void>;
   addMood: (mood: number, note?: string) => Promise<void>;
   setChat: (msgs: ChatMessage[]) => void;
+  enqueueAssistant: (id: string) => void;
+  dequeueAssistant: () => string | undefined;
+  peekAssistant: () => string | undefined;
+  replaceAssistantHead: (id: string) => void;
+  removeAssistant: (id: string) => void;
   clearChat: () => void;
   addJournal: (content: string) => void;
   removeJournal: (id: string) => void;
   clearJournal: () => void;
 };
 
-export const useJournalStore = create<JournalState>((set) => ({
+export const useJournalStore = create<JournalState>((set, get) => ({
   journal: [],
   moods: [],
   chat: [],
+  assistantMessageQueue: [],
+
+  flushAssistantQueue: (fallback) => {
+    set((state) => {
+      if (state.assistantMessageQueue.length === 0) {
+        return { assistantMessageQueue: [] };
+      }
+
+      const pending = new Set(state.assistantMessageQueue);
+
+      if (!fallback) {
+        return {
+          assistantMessageQueue: [],
+          chat: state.chat.filter(
+            (msg) =>
+              !(
+                pending.has(msg.id) &&
+                msg.role === 'assistant' &&
+                (msg.text ?? '').trim().length === 0
+              )
+          ),
+        };
+      }
+
+      return {
+        assistantMessageQueue: [],
+        chat: state.chat.map((msg) => {
+          if (
+            pending.has(msg.id) &&
+            msg.role === 'assistant' &&
+            (msg.text ?? '').trim().length === 0
+          ) {
+            return {
+              ...msg,
+              text: fallback.text,
+              time: fallback.time,
+            };
+          }
+          return msg;
+        }),
+      };
+    });
+  },
 
   fetchJournal: async (userId: string) => {
     try {
@@ -205,9 +252,47 @@ export const useJournalStore = create<JournalState>((set) => ({
   setChat: (msgs) => {
     set({ chat: msgs });
   },
-  
+
+  enqueueAssistant: (id: string) => {
+    set((state) => ({
+      assistantMessageQueue: [...state.assistantMessageQueue, id],
+    }));
+  },
+
+  dequeueAssistant: () => {
+    const [head, ...rest] = get().assistantMessageQueue;
+    if (!head) {
+      return undefined;
+    }
+    set({ assistantMessageQueue: rest });
+    return head;
+  },
+
+  peekAssistant: () => get().assistantMessageQueue[0],
+
+  replaceAssistantHead: (id: string) => {
+    set((state) =>
+      state.assistantMessageQueue.length === 0
+        ? { assistantMessageQueue: [id] }
+        : {
+            assistantMessageQueue: [
+              id,
+              ...state.assistantMessageQueue.slice(1),
+            ],
+          }
+    );
+  },
+
+  removeAssistant: (id: string) => {
+    set((state) => ({
+      assistantMessageQueue: state.assistantMessageQueue.filter(
+        (existing) => existing !== id
+      ),
+    }));
+  },
+
   clearChat: () => {
-    set({ chat: [] });
+    set({ chat: [], assistantMessageQueue: [] });
   },
 
   addJournal: (content: string) => {

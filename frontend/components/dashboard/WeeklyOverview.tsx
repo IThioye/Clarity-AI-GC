@@ -1,20 +1,9 @@
 "use client"
 
-import { useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import type { MouseEvent } from 'react'
 import { useJournalStore } from '../../lib/store'
 import { generateMockMoods } from '../../lib/dashboard/mock'
-
-function getLast7DaysLabels() {
-  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat']
-  const now = new Date()
-  const arr: string[] = []
-  for (let i=6;i>=0;i--) {
-    const d = new Date(now)
-    d.setDate(now.getDate()-i)
-    arr.push(days[d.getDay()])
-  }
-  return arr
-}
 
 export default function WeeklyOverview() {
   const moods = useJournalStore((s) => s.moods)
@@ -59,21 +48,34 @@ function ChartSpark({ data, labels }: { data: number[]; labels: string[] }) {
   const padX = 24
   const padY = 20
   const n = data.length
-  const sx = (i: number) => padX + (i * (w - padX * 2)) / Math.max(1, n - 1)
-  const sy = (m: number) => padY + (h - padY * 2) * (1 - Math.max(0, Math.min(10, m)) / 10)
 
-  const path = useMemo(() => data.reduce((d, m, i) => {
-    const x = sx(i)
-    const y = sy(m)
-    return d + (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`)
-  }, ''), [data, sx, sy])
+  const sx = useCallback(
+    (i: number) => padX + (i * (w - padX * 2)) / Math.max(1, n - 1),
+    [n, padX, w]
+  )
+  const sy = useCallback(
+    (m: number) => padY + (h - padY * 2) * (1 - Math.max(0, Math.min(10, m)) / 10),
+    [h, padY]
+  )
 
-  const area = useMemo(() => path + ` L ${padX + (w - padX * 2)} ${h - padY} L ${padX} ${h - padY} Z`, [path, padX, w, h, padY])
+  const path = useMemo(
+    () => data.reduce((d, m, i) => {
+      const x = sx(i)
+      const y = sy(m)
+      return d + (i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`)
+    }, ''),
+    [data, sx, sy]
+  )
+
+  const area = useMemo(
+    () => path + ` L ${padX + (w - padX * 2)} ${h - padY} L ${padX} ${h - padY} Z`,
+    [path, padX, w, h, padY]
+  )
 
   const svgRef = useRef<SVGSVGElement>(null)
   const [hoverIdx, setHoverIdx] = useState<number | null>(null)
 
-  function onMove(e: React.MouseEvent<SVGSVGElement>) {
+  function onMove(e: MouseEvent<SVGSVGElement>) {
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect) return
     const x = e.clientX - rect.left

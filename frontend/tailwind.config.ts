@@ -11,11 +11,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        'text-primary': '#EAEAEA',
-        'text-secondary': '#B4B4B4',
-        'acc-blue': '#8FC8FF',
-        'acc-violet': '#C58AFF',
-        'acc-rose': '#F59E0B',
+        'text-primary': 'rgb(var(--text-primary) / <alpha-value>)',
+        'text-secondary': 'rgb(var(--text-secondary) / <alpha-value>)',
+        'acc-blue': 'rgb(var(--acc-blue) / <alpha-value>)',
+        'acc-violet': 'rgb(var(--acc-violet) / <alpha-value>)',
+        'acc-rose': 'rgb(var(--acc-rose) / <alpha-value>)',
       },
     },
   },
@@ -23,21 +23,26 @@ const config: Config = {
     function ({ addUtilities }: { addUtilities: any }) {
       const newUtilities = {
         '.glass': {
-          background: 'rgba(255,255,255,0.12)',
-          'backdrop-filter': 'blur(12px)',
+          background: 'var(--glass-bg)',
+          'backdrop-filter': 'blur(18px)',
           'border-radius': '1rem',
-          border: '1px solid rgba(255,255,255,0.2)',
+          border: '1px solid var(--glass-border)',
+          'box-shadow': 'var(--shadow-soft)',
+          transition: 'background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease',
         },
         '.glass-surface': {
-          background: 'rgba(255,255,255,0.06)',
-          'backdrop-filter': 'blur(12px)',
+          background: 'var(--glass-surface-bg)',
+          'backdrop-filter': 'blur(22px)',
+          border: '1px solid var(--glass-border)',
+          'box-shadow': 'var(--shadow-soft)',
+          transition: 'background 0.3s ease, border 0.3s ease, box-shadow 0.3s ease',
         },
         '.neon-edge': {
-          'box-shadow': '0 0 8px rgba(197,138,255,0.3), 0 0 20px rgba(143,200,255,0.4)',
+          'box-shadow': 'var(--shadow-glow)',
         },
         '.focus-ring': {
-          '--tw-ring-color': 'rgba(197,138,255,0.5) !important',
-          '--tw-ring-offset-shadow': '0 0 0 var(--tw-ring-offset-width, 0) var(--tw-ring-offset-color, #000) !important',
+          '--tw-ring-color': 'var(--ring-accent) !important',
+          '--tw-ring-offset-shadow': '0 0 0 var(--tw-ring-offset-width, 0) var(--tw-ring-offset-color, rgba(0,0,0,0)) !important',
           '--tw-ring-shadow': '0 0 0 calc(2px + var(--tw-ring-offset-width, 0)) var(--tw-ring-color) !important',
           'box-shadow': 'var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000) !important',
           outline: 'none !important',
