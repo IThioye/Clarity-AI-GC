@@ -136,7 +136,6 @@ type JournalState = {
   moods: MoodEntry[];
   chat: ChatMessage[];
   assistantQueue: string[];
-  flushAssistantQueue: (fallback?: { text: string; time: string }) => void;
   fetchJournal: (userId: string) => Promise<void>;
   fetchMoods: (userId: string, journalId: number) => Promise<void>;
   addMood: (mood: number, note?: string) => Promise<void>;
@@ -157,48 +156,6 @@ export const useJournalStore = create<JournalState>((set, get) => ({
   moods: [],
   chat: [],
   assistantQueue: [],
-
-  flushAssistantQueue: (fallback) => {
-    set((state) => {
-      if (state.assistantQueue.length === 0) {
-        return { assistantQueue: [] };
-      }
-
-      const pending = new Set(state.assistantQueue);
-
-      if (!fallback) {
-        return {
-          assistantQueue: [],
-          chat: state.chat.filter(
-            (msg) =>
-              !(
-                pending.has(msg.id) &&
-                msg.role === 'assistant' &&
-                (msg.text ?? '').trim().length === 0
-              )
-          ),
-        };
-      }
-
-      return {
-        assistantQueue: [],
-        chat: state.chat.map((msg) => {
-          if (
-            pending.has(msg.id) &&
-            msg.role === 'assistant' &&
-            (msg.text ?? '').trim().length === 0
-          ) {
-            return {
-              ...msg,
-              text: fallback.text,
-              time: fallback.time,
-            };
-          }
-          return msg;
-        }),
-      };
-    });
-  },
 
   fetchJournal: async (userId: string) => {
     try {
