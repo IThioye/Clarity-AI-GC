@@ -12,7 +12,14 @@ let isConnected = false;
 const pendingMessages: any[] = [];
 
 // We get the chat update function from the Zustand store
-const { setChat } = useJournalStore.getState();
+const {
+  setChat,
+  enqueueAssistant,
+  dequeueAssistant,
+  peekAssistant,
+  replaceAssistantHead,
+  removeAssistant,
+} = useJournalStore.getState();
 
 const connectSocket = (userId: string) => {
   if (socket) {
