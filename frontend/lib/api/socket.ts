@@ -175,6 +175,10 @@ const connectSocket = (userId: string) => {
 
   socket.onerror = (error) => {
     console.error('WebSocket Error:', error);
+    flushAssistantQueue({
+      text: 'Something interfered with our chat. Please try again once the connection looks steady.',
+      time: formatTimestamp(),
+    });
   };
 };
 
