@@ -1,7 +1,7 @@
 
 
-import { GCP_AGENT_WS_URL } from '@/lib/config';
-import { useJournalStore, type ChatMessage } from '@/lib/store';
+import { getGcpAgentWsUrl } from '@/lib/config';
+import { useJournalStore } from '@/lib/store';
 import { useAuthStore } from '@/lib/authStore';
 
 const formatTimestamp = () =>
@@ -39,12 +39,14 @@ const connectSocket = (userId: string) => {
     return;
   }
 
-  if (!GCP_AGENT_WS_URL) {
-    console.error('GCP_AGENT_WS_URL is not set. Cannot connect WebSocket.');
+  const agentWsUrl = getGcpAgentWsUrl();
+
+  if (!agentWsUrl) {
+    console.error('GCP agent WebSocket URL is not set. Cannot connect WebSocket.');
     return;
   }
 
-  const url = `${GCP_AGENT_WS_URL}/ws/${userId}`;
+  const url = `${agentWsUrl}/ws/${userId}`;
   socket = new WebSocket(url);
 
   socket.onopen = () => {

@@ -1,4 +1,4 @@
-import { AZURE_API_URL, GCP_AGENT_URL } from '@/lib/config';
+import { getAzureApiUrl, getGcpAgentUrl } from '@/lib/config';
 
 const joinUrl = (base: string, path: string) => {
   if (!path) return base;
@@ -52,19 +52,19 @@ const api = {
 // 1. Client for talking to the Azure Admin API
 export const azureApi = {
   get: (path: string, options?: RequestInit) =>
-    api.get(joinUrl(AZURE_API_URL, path), options),
+    api.get(joinUrl(getAzureApiUrl(), path), options),
   post: (path: string, body: any, options?: RequestInit) =>
-    api.post(joinUrl(AZURE_API_URL, path), body, options),
+    api.post(joinUrl(getAzureApiUrl(), path), body, options),
   put: (path: string, body: any, options?: RequestInit) =>
-    api.put(joinUrl(AZURE_API_URL, path), body, options),
+    api.put(joinUrl(getAzureApiUrl(), path), body, options),
 };
 
 // 2. Client for talking to our GCP Agent API (for non-chat stuff)
 export const gcpApi = {
   get: (path: string, options?: RequestInit) =>
-    api.get(joinUrl(GCP_AGENT_URL, path), options),
+    api.get(joinUrl(getGcpAgentUrl(), path), options),
   post: (path: string, body: any, options?: RequestInit) =>
-    api.post(joinUrl(GCP_AGENT_URL, path), body, options),
+    api.post(joinUrl(getGcpAgentUrl(), path), body, options),
   put: (path: string, body: any, options?: RequestInit) =>
-    api.put(joinUrl(GCP_AGENT_URL, path), body, options),
+    api.put(joinUrl(getGcpAgentUrl(), path), body, options),
 };
