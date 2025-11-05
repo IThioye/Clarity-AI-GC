@@ -19,6 +19,7 @@ const {
   peekAssistant,
   replaceAssistantHead,
   removeAssistant,
+  flushAssistantQueue,
 } = useJournalStore.getState();
 
 const connectSocket = (userId: string) => {
@@ -67,27 +68,47 @@ const connectSocket = (userId: string) => {
       case 'ACK': {
         // Confirmation that a "NONE" route was processed
         console.log('Server ACK:', message.status);
+        const ackText = message.text || 'I’ve logged that entry for you.';
+        const queuedAssistantId = peekAssistant();
+        let matched = false;
+
         useJournalStore.setState((state) => {
-          const ackText = message.text || 'I’ve logged that entry for you.';
-          const updated: ChatMessage[] = [...state.chat];
-          for (let i = updated.length - 1; i >= 0; i -= 1) {
-            if (updated[i]?.role === 'assistant') {
-              updated[i] = { ...updated[i], text: ackText };
+          if (queuedAssistantId) {
+            const updated = state.chat.map((msg) => {
+              if (msg.id === queuedAssistantId) {
+                matched = true;
+                return {
+                  ...msg,
+                  text: ackText,
+                  time: formatTimestamp(),
+                };
+              }
+              return msg;
+            });
+
+            if (matched) {
               return { chat: updated };
             }
           }
+
+          matched = true;
           return {
             chat: [
-              ...updated,
+              ...state.chat,
               {
                 id: crypto.randomUUID(),
                 role: 'assistant' as const,
                 text: ackText,
-                time: new Date().toISOString(),
+                time: formatTimestamp(),
               },
             ],
           };
         });
+
+        if (matched && queuedAssistantId) {
+          dequeueAssistant();
+        }
+
         break;
       }
 
@@ -103,7 +124,7 @@ const connectSocket = (userId: string) => {
             return;
           }
 
-          const queuedAssistantId = assistantMessageQueue[0];
+          const queuedAssistantId = peekAssistant();
           let matched = false;
           let replacementId: string | null = null;
 
@@ -142,10 +163,10 @@ const connectSocket = (userId: string) => {
           });
 
           if (replacementId) {
-            if (assistantMessageQueue.length === 0) {
-              assistantMessageQueue.push(replacementId);
+            if (!queuedAssistantId) {
+              enqueueAssistant(replacementId);
             } else if (!matched) {
-              assistantMessageQueue[0] = replacementId;
+              replaceAssistantHead(replacementId);
             }
           }
         })();
@@ -161,6 +182,7 @@ const connectSocket = (userId: string) => {
         } catch (error) {
           console.error('Failed to play audio response:', error);
         }
+        dequeueAssistant();
         break;
     }
   };
@@ -170,6 +192,10 @@ const connectSocket = (userId: string) => {
     isConnected = false;
     socket = null;
     pendingMessages.length = 0;
+    flushAssistantQueue({
+      text: 'I lost our connection before I could finish that thought. Please try again.',
+      time: formatTimestamp(),
+    });
     // We could add auto-reconnect logic here
   };
 
@@ -224,7 +250,7 @@ export const sendChatMessage = (text: string) => {
   // Update the store
   const currentChat = useJournalStore.getState().chat;
   setChat([...currentChat, userMessage, assistantMessage]);
-  assistantMessageQueue.push(assistantMessage.id);
+  enqueueAssistant(assistantMessage.id);
 
   // 4. Send the user's text to the backend
   const sent = sendOverSocket({
@@ -242,9 +268,11 @@ export const sendChatMessage = (text: string) => {
               ...msg,
               text:
                 'I could not reach our thinking space just now. Please check your connection and try again.',
+              time: formatTimestamp(),
             }
           : msg
       ),
     }));
+    removeAssistant(assistantMessage.id);
   }
 };
