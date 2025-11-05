@@ -1,7 +1,7 @@
 
 
 import { GCP_AGENT_WS_URL } from '@/lib/config';
-import { useJournalStore } from '@/lib/store';
+import { useJournalStore, type ChatMessage } from '@/lib/store';
 import { useAuthStore } from '@/lib/authStore';
 
 const formatTimestamp = () =>
@@ -67,47 +67,27 @@ const connectSocket = (userId: string) => {
       case 'ACK': {
         // Confirmation that a "NONE" route was processed
         console.log('Server ACK:', message.status);
-        const ackText = message.text || 'I’ve logged that entry for you.';
-        const queuedAssistantId = peekAssistant();
-        let matched = false;
-
         useJournalStore.setState((state) => {
-          if (queuedAssistantId) {
-            const updated = state.chat.map((msg) => {
-              if (msg.id === queuedAssistantId) {
-                matched = true;
-                return {
-                  ...msg,
-                  text: ackText,
-                  time: formatTimestamp(),
-                };
-              }
-              return msg;
-            });
-
-            if (matched) {
+          const ackText = message.text || 'I’ve logged that entry for you.';
+          const updated: ChatMessage[] = [...state.chat];
+          for (let i = updated.length - 1; i >= 0; i -= 1) {
+            if (updated[i]?.role === 'assistant') {
+              updated[i] = { ...updated[i], text: ackText };
               return { chat: updated };
             }
           }
-
-          matched = true;
           return {
             chat: [
-              ...state.chat,
+              ...updated,
               {
                 id: crypto.randomUUID(),
                 role: 'assistant' as const,
                 text: ackText,
-                time: formatTimestamp(),
+                time: new Date().toISOString(),
               },
             ],
           };
         });
-
-        if (matched && queuedAssistantId) {
-          dequeueAssistant();
-        }
-
         break;
       }
 
@@ -123,7 +103,7 @@ const connectSocket = (userId: string) => {
             return;
           }
 
-          const queuedAssistantId = peekAssistant();
+          const queuedAssistantId = assistantMessageQueue[0];
           let matched = false;
           let replacementId: string | null = null;
 
@@ -162,10 +142,10 @@ const connectSocket = (userId: string) => {
           });
 
           if (replacementId) {
-            if (!queuedAssistantId) {
-              enqueueAssistant(replacementId);
+            if (assistantMessageQueue.length === 0) {
+              assistantMessageQueue.push(replacementId);
             } else if (!matched) {
-              replaceAssistantHead(replacementId);
+              assistantMessageQueue[0] = replacementId;
             }
           }
         })();
@@ -181,7 +161,6 @@ const connectSocket = (userId: string) => {
         } catch (error) {
           console.error('Failed to play audio response:', error);
         }
-        dequeueAssistant();
         break;
     }
   };
@@ -241,7 +220,7 @@ export const sendChatMessage = (text: string) => {
   // Update the store
   const currentChat = useJournalStore.getState().chat;
   setChat([...currentChat, userMessage, assistantMessage]);
-  enqueueAssistant(assistantMessage.id);
+  assistantMessageQueue.push(assistantMessage.id);
 
   // 4. Send the user's text to the backend
   const sent = sendOverSocket({
@@ -259,11 +238,9 @@ export const sendChatMessage = (text: string) => {
               ...msg,
               text:
                 'I could not reach our thinking space just now. Please check your connection and try again.',
-              time: formatTimestamp(),
             }
           : msg
       ),
     }));
-    removeAssistant(assistantMessage.id);
   }
 };
