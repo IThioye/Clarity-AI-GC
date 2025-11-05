@@ -17,9 +17,22 @@ export const metadata: Metadata = {
   },
 }
 
+const runtimeEnv = {
+  NEXT_PUBLIC_GCP_AGENT_URL: process.env.NEXT_PUBLIC_GCP_AGENT_URL ?? null,
+  NEXT_PUBLIC_AZURE_API_URL: process.env.NEXT_PUBLIC_AZURE_API_URL ?? null,
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        <script
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: `window.__RUNTIME_CONFIG__ = ${JSON.stringify(runtimeEnv)};`,
+          }}
+        />
+      </head>
       <body className={`${plusJakarta.className} bg-[var(--bg-deep)] text-text-primary`}>
         <div className={`${inter.className}`}>
           <ThemeSync />
